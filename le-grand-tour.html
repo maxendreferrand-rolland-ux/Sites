@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Le Grand Tour</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..600;1,6..96,400..600&family=Instrument+Sans:wght@400;500&family=Martian+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+@property --accent { syntax: '<color>'; inherits: true; initial-value: #ffb24a; }
+
+/* Layout: an editorial column on the left scrolls over a fixed, hand-drawn cosmos;
+   a distance HUD runs along the top and a stop rail along the right edge. */
+:root {
+  --void: #04050b;
+  --ink: #ece7db;
+  --ink-dim: #9a97a6;
+  --line: rgba(236, 231, 219, 0.14);
+  --panel: rgba(6, 8, 18, 0.74);
+  --sun: #ffb24a;
+  --accent: #ffb24a;
+
+  --display: 'Bodoni Moda', 'Didot', 'Bodoni 72', Georgia, serif;
+  --body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'Martian Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --gutter: clamp(16px, 6vw, 112px);
+  color-scheme: dark;
+  transition: --accent 0.9s ease;
+}
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection { background: var(--accent); color: var(--void); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+
+canvas.cosmos {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+#sky { z-index: 0; }
+#bodies { z-index: 1; }
+
+/* ───────── Top bar + HUD ───────── */
+.bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) clamp(16px, 4vw, 40px) 28px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--void) 90%, transparent), transparent);
+}
+.brand {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 1.3rem;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.brand b { font-weight: 400; color: var(--accent); }
+.hud {
+  display: flex;
+  gap: clamp(1rem, 2.6vw, 2.4rem);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.hud div { display: grid; gap: 0.15rem; text-align: right; }
+.hud .k {
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.hud .v {
+  font-size: 0.86rem;
+  font-weight: 400;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.hud .v.au { color: var(--accent); }
+
+/* ───────── Stop rail ───────── */
+.rail {
+  position: fixed;
+  right: clamp(14px, 2vw, 32px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+}
+.rail a {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 0.7rem;
+  text-decoration: none;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.rail .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-dim);
+  transition: transform 0.4s, background-color 0.4s, border-color 0.4s;
+  flex: none;
+}
+.rail .nm { opacity: 0; transform: translateX(6px); transition: opacity 0.3s, transform 0.3s; }
+.rail a:hover .nm, .rail a:focus-visible .nm, .rail a[aria-current="step"] .nm { opacity: 1; transform: none; }
+.rail a[aria-current="step"] { color: var(--ink); }
+.rail a[aria-current="step"] .dot { background: var(--accent); border-color: var(--accent); transform: scale(1.5); }
+
+/* ───────── Content ───────── */
+main {
+  position: relative;
+  z-index: 2;
+  padding-inline: var(--gutter);
+}
+
+.eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.eyebrow span + span { color: var(--ink-dim); }
+
+/* Hero */
+.hero {
+  min-height: 100svh;
+  display: grid;
+  align-content: end;
+  gap: 1.6rem;
+  padding-block: 22vh 9vh;
+  max-width: min(46rem, 62vw);
+}
+.hero h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(3.8rem, 12.5vw, 12rem);
+  line-height: 0.82;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.hero h1 em { font-style: italic; color: var(--sun); }
+.hero .lede { margin: 0; font-size: 1.12rem; max-width: 34em; color: var(--ink); }
+
+.scale { margin: 0.6rem 0 0; max-width: 34rem; }
+.scale figcaption {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 1.1rem;
+}
+.scale .track { position: relative; height: 46px; border-top: 1px solid var(--line); }
+.scale .pt { position: absolute; top: -4px; left: var(--x); width: 7px; height: 7px; margin-left: -3.5px; border-radius: 50%; background: var(--ink); }
+.scale .pt.sun { width: 11px; height: 11px; top: -6px; margin-left: -5.5px; background: var(--sun); box-shadow: 0 0 14px var(--sun); }
+.scale .lb {
+  position: absolute;
+  top: 12px;
+  left: var(--x);
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.scale .lb.end { transform: translateX(-100%); }
+.scale .lb.start { transform: none; }
+.scale .bracket { position: absolute; top: 6px; left: 0; width: var(--x); height: 4px; border: 1px solid var(--ink-dim); border-top: 0; }
+
+.cue {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1.4rem;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.cue i { display: block; width: 1px; height: 44px; background: linear-gradient(var(--ink), transparent); transform-origin: top; animation: cue 2.4s ease-in-out infinite; }
+@keyframes cue { 0% { transform: scaleY(0); } 50% { transform: scaleY(1); } 100% { transform: scaleY(1); opacity: 0; } }
+
+/* Stops */
+.stop { position: relative; min-height: 190vh; }
+.stop-inner {
+  position: sticky;
+  top: max(17vh, 104px);
+  max-width: min(34rem, 46vw);
+  display: grid;
+  gap: 1.1rem;
+  padding-block: 1rem 2rem;
+}
+.stop h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(3.4rem, 9vw, 8.6rem);
+  line-height: 0.9;
+  letter-spacing: -0.015em;
+  text-shadow: 0 2px 30px var(--void);
+}
+.stop .lede { margin: 0; font-size: 1.1rem; max-width: 34em; text-shadow: 0 1px 14px var(--void); }
+
+.facts {
+  margin: 0.4rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  border-top: 1px solid var(--line);
+}
+.facts div { padding: 0.7rem 0.9rem 0.75rem 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.facts dt {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.facts dd {
+  margin: 0.2rem 0 0;
+  font-size: 1.12rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.note { margin: 0.3rem 0 0; color: var(--ink-dim); font-size: 0.98rem; max-width: 34em; }
+.note b {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.interlude h2 { font-size: clamp(2.8rem, 7vw, 6.4rem); }
+.outro { min-height: 210vh; }
+
+.back {
+  justify-self: start;
+  margin-top: 0.6rem;
+  padding: 0.8rem 1.4rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 0.3s, color 0.3s;
+}
+.back:hover { background: var(--accent); color: var(--void); }
+
+footer {
+  position: relative;
+  z-index: 2;
+  padding: 4rem var(--gutter) calc(3rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  color: var(--ink-dim);
+  font-size: 0.86rem;
+  background: var(--void);
+}
+footer p { margin: 0; max-width: 46rem; }
+
+/* Scroll-driven reveals (pure CSS; content is fully visible without them) */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .stop .stop-inner > * {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+    }
+    .stop h2 { animation-name: rise-wide; }
+  }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(48px); } to { opacity: 1; transform: none; } }
+@keyframes rise-wide { from { opacity: 0; transform: translateY(70px); letter-spacing: 0.06em; } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cue i { animation: none; transform: none; }
+}
+
+/* ───────── Narrow screens ───────── */
+@media (max-width: 900px) {
+  .rail { display: none; }
+}
+@media (max-width: 760px) {
+  .bar { padding-bottom: 22px; }
+  .brand { font-size: 1.1rem; }
+  .hud .v { font-size: 0.74rem; }
+  .hero { max-width: none; padding-block: 44svh 8svh; }
+  .stop { min-height: 150svh; }
+  .stop-inner {
+    position: relative;
+    top: auto;
+    max-width: none;
+    margin-top: 48svh;
+    padding: 1.3rem 1.2rem 1.4rem;
+    background: var(--panel);
+    -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+  }
+  .stop h2 { font-size: clamp(3rem, 16vw, 4.8rem); }
+}
+@media (max-width: 520px) {
+  .hud .km { display: none; }
+}
+</style>
+
+</head>
+<body>
+<canvas id="sky" class="cosmos" aria-hidden="true"></canvas>
+<canvas id="bodies" class="cosmos" aria-hidden="true"></canvas>
+
+<header class="bar">
+  <a class="brand" href="#top">Le <b>Grand</b> Tour</a>
+  <div class="hud" aria-label="Position actuelle">
+    <div><span class="k">Distance au Soleil</span><span class="v au" id="hud-au">0,00 UA</span></div>
+    <div class="km"><span class="k">Kilomètres</span><span class="v" id="hud-km">0</span></div>
+    <div><span class="k">Lumière du Soleil</span><span class="v" id="hud-light">0 s</span></div>
+  </div>
+</header>
+
+<nav class="rail" aria-label="Escales">
+  <a href="#mercure" data-key="mercure"><span class="dot"></span><span class="nm">Mercure</span></a>
+  <a href="#venus" data-key="venus"><span class="dot"></span><span class="nm">Vénus</span></a>
+  <a href="#terre" data-key="terre"><span class="dot"></span><span class="nm">Terre</span></a>
+  <a href="#mars" data-key="mars"><span class="dot"></span><span class="nm">Mars</span></a>
+  <a href="#ceinture" data-key="ceinture"><span class="dot"></span><span class="nm">Ceinture</span></a>
+  <a href="#jupiter" data-key="jupiter"><span class="dot"></span><span class="nm">Jupiter</span></a>
+  <a href="#saturne" data-key="saturne"><span class="dot"></span><span class="nm">Saturne</span></a>
+  <a href="#uranus" data-key="uranus"><span class="dot"></span><span class="nm">Uranus</span></a>
+  <a href="#neptune" data-key="neptune"><span class="dot"></span><span class="nm">Neptune</span></a>
+  <a href="#voyager" data-key="voyager"><span class="dot"></span><span class="nm">Au-delà</span></a>
+</nav>
+
+<main>
+  <section class="hero" id="top" data-key="soleil" data-body="sun" data-au="0" data-accent="255,178,74">
+    <p class="eyebrow"><span>Du Soleil à l’espace interstellaire</span></p>
+    <h1>Le <em>Grand</em> Tour</h1>
+    <p class="lede">Huit planètes et 4,5 milliards de kilomètres à parcourir en faisant défiler la page. Le compteur en haut indique votre distance au Soleil et le temps que met sa lumière pour vous atteindre.</p>
+
+    <figure class="scale">
+      <figcaption>Distances réelles, de 0 à 30 UA</figcaption>
+      <div class="track">
+        <span class="bracket" style="--x:5.06%"></span>
+        <span class="pt sun" style="--x:0%"></span>
+        <span class="pt" style="--x:1.29%"></span>
+        <span class="pt" style="--x:2.40%"></span>
+        <span class="pt" style="--x:3.33%"></span>
+        <span class="pt" style="--x:5.06%"></span>
+        <span class="pt" style="--x:17.29%"></span>
+        <span class="pt" style="--x:31.86%"></span>
+        <span class="pt" style="--x:63.85%"></span>
+        <span class="pt" style="--x:100%"></span>
+        <span class="lb start" style="--x:0%; top:16px">Mercure → Mars</span>
+        <span class="lb" style="--x:17.29%">Jupiter</span>
+        <span class="lb" style="--x:31.86%">Saturne</span>
+        <span class="lb" style="--x:63.85%">Uranus</span>
+        <span class="lb end" style="--x:100%">Neptune</span>
+      </div>
+    </figure>
+
+    <p class="cue"><i></i>Faites défiler pour décoller</p>
+  </section>
+
+  <section class="stop" id="mercure" data-key="mercure" data-body="mercury" data-au="0.387" data-accent="206,196,184">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Escale 1</span><span>0,39 UA</span></p>
+      <h2>Mercure</h2>
+      <p class="lede">La plus petite planète, et la plus proche du Soleil. Sans atmosphère pour retenir la chaleur, sa surface passe de 430 °C le jour à −180 °C la nuit.</p>
+      <dl class="facts">
+        <div><dt>Diamètre</dt><dd>4 879 km</dd></div>
+        <div><dt>Rotation</dt><dd>58,6 jours</dd></div>
+        <div><dt>Année</dt><dd>88 jours</dd></div>
+        <div><dt>Lunes</dt><dd>0</dd></div>
+      </dl>
+      <p class="note"><b>À savoir</b>Un jour solaire complet, d’un lever de Soleil au suivant, y dure 176 jours terrestres, soit deux de ses années.</p>
+    </div>
+  </section>
+
+  <section class="stop" id="venus" data-key="venus" data-body="venus" data-au="0.723" data-accent="236,200,122">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Escale 2</span><span>0,72 UA</span></p>
+      <h2>Vénus</h2>
+      <p class="lede">Presque la jumelle de la Terre par la taille, mais son épaisse atmosphère de CO₂ en fait la planète la plus chaude : 464 °C au sol, sous une pression 92 fois supérieure à la nôtre.</p>
+      <dl class="facts">
+        <div><dt>Diamètre</dt><dd>12 104 km</dd></div>
+        <div><dt>Rotation</dt><dd>243 jours</dd></div>
+        <div><dt>Année</dt><dd>225 jours</dd></div>
+        <div><dt>Lunes</dt><dd>0</dd></div>
+      </dl>
+      <p class="note"><b>À savoir</b>Elle tourne dans le sens inverse des autres planètes, et si lentement que sa rotation dure plus longtemps que son année.</p>
+    </div>
+  </section>
+
+  <section class="stop" id="terre" data-key="terre" data-body="earth" data-au="1" data-accent="122,182,255">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Escale 3</span><span>1,00 UA</span></p>
+      <h2>Terre</h2>
+      <p class="lede">La seule planète connue à abriter la vie, et la seule dont la surface porte de l’eau liquide de façon stable. La lumière qui vous éclaire ici a quitté le Soleil il y a 8 minutes et 19 secondes.</p>
+      <dl class="facts">
+        <div><dt>Diamètre</dt><dd>12 742 km</dd></div>
+        <div><dt>Rotation</dt><dd>23 h 56 min</dd></div>
+        <div><dt>Année</dt><dd>365,25 jours</dd></div>
+        <div><dt>Lunes</dt><dd>1</dd></div>
+      </dl>
+      <p class="note"><b>À savoir</b>L’unité astronomique, la règle de tout ce voyage, correspond à la distance moyenne entre la Terre et le Soleil : 149 597 871 km.</p>
+    </div>
+  </section>
+
+  <section class="stop" id="mars" data-key="mars" data-body="mars" data-au="1.524" data-accent="255,128,86">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Escale 4</span><span>1,52 UA</span></p>
+      <h2>Mars</h2>
+      <p class="lede">Un désert froid, rougi par l’oxyde de fer. Il porte Olympus Mons, le plus haut volcan connu du système solaire, qui culmine à environ 22 km au-dessus des plaines.</p>
+      <dl class="facts">
+        <div><dt>Diamètre</dt><dd>6 779 km</dd></div>
+        <div><dt>Rotation</dt><dd>24 h 37 min</dd></div>
+        <div><dt>Année</dt><dd>687 jours</dd></div>
+        <div><dt>Lunes</dt><dd>2</dd></div>
+      </dl>
+      <p class="note"><b>À savoir</b>Ses deux lunes, Phobos et Déimos, sont probablement des astéroïdes capturés par sa gravité.</p>
+    </div>
+  </section>
+
+  <section class="stop interlude" id="ceinture" data-key="ceinture" data-body="belt" data-au="2.7" data-accent="196,182,164">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Traversée</span><span>2,2 à 3,3 UA</span></p>
+      <h2>La ceinture d’astéroïdes</h2>
+      <p class="lede">Des millions de rochers circulent entre Mars et Jupiter. Leur masse totale ne représente pourtant qu’environ 3 % de celle de la Lune, et deux astéroïdes voisins sont souvent séparés de centaines de milliers de kilomètres.</p>
+      <p class="note"><b>À savoir</b>Cérès, le plus gros objet de la ceinture, mesure environ 940 km de diamètre. Elle est classée planète naine depuis 2006.</p>
+    </div>
+  </section>
+
+  <section class="stop" id="jupiter" data-key="jupiter" data-body="jupiter" data-au="5.203" data-accent="238,170,108">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Escale 5</span><span>5,20 UA</span></p>
+      <h2>Jupiter</h2>
+      <p class="lede">Plus de deux fois la masse de toutes les autres planètes réunies. Sa Grande Tache rouge est une tempête plus large que la Terre, suivie sans interruption depuis 1830.</p>
+      <dl class="facts">
+        <div><dt>Diamètre</dt><dd>139 820 km</dd></div>
+        <div><dt>Rotation</dt><dd>9 h 56 min</dd></div>
+        <div><dt>Année</dt><dd>11,9 ans</dd></div>
+        <div><dt>Lunes connues</dt><dd>90+</dd></div>
+      </dl>
+      <p class="note"><b>À savoir</b>Ganymède, sa plus grande lune, est plus grande que la planète Mercure.</p>
+    </div>
+  </section>
+
+  <section class="stop" id="saturne" data-key="saturne" data-body="saturn" data-au="9.537" data-accent="232,206,146">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Escale 6</span><span>9,54 UA</span></p>
+      <h2>Saturne</h2>
+      <p class="lede">Ses anneaux principaux s’étendent sur près de 280 000 km, mais leur épaisseur ne dépasse souvent pas une dizaine de mètres. Sa densité moyenne est inférieure à celle de l’eau.</p>
+      <dl class="facts">
+        <div><dt>Diamètre</dt><dd>116 460 km</dd></div>
+        <div><dt>Rotation</dt><dd>10 h 34 min</dd></div>
+        <div><dt>Année</dt><dd>29,4 ans</dd></div>
+        <div><dt>Lunes connues</dt><dd>140+</dd></div>
+      </dl>
+      <p class="note"><b>À savoir</b>Titan, sa plus grande lune, possède une atmosphère épaisse et des lacs de méthane liquide.</p>
+    </div>
+  </section>
+
+  <section class="stop" id="uranus" data-key="uranus" data-body="uranus" data-au="19.19" data-accent="150,226,230">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Escale 7</span><span>19,2 UA</span></p>
+      <h2>Uranus</h2>
+      <p class="lede">Une géante de glace couchée sur le côté, avec un axe incliné de 98°. Chacun de ses pôles connaît environ 42 ans de jour continu, puis 42 ans de nuit.</p>
+      <dl class="facts">
+        <div><dt>Diamètre</dt><dd>50 724 km</dd></div>
+        <div><dt>Rotation</dt><dd>17 h 14 min</dd></div>
+        <div><dt>Année</dt><dd>84 ans</dd></div>
+        <div><dt>Lunes connues</dt><dd>28+</dd></div>
+      </dl>
+      <p class="note"><b>À savoir</b>Une seule sonde l’a approchée : Voyager 2, en janvier 1986.</p>
+    </div>
+  </section>
+
+  <section class="stop" id="neptune" data-key="neptune" data-body="neptune" data-au="30.07" data-accent="118,146,255">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Escale 8</span><span>30,1 UA</span></p>
+      <h2>Neptune</h2>
+      <p class="lede">La planète la plus lointaine, découverte en 1846 par le calcul avant d’être vue au télescope. Ses vents dépassent 2 000 km/h, les plus rapides du système solaire.</p>
+      <dl class="facts">
+        <div><dt>Diamètre</dt><dd>49 244 km</dd></div>
+        <div><dt>Rotation</dt><dd>16 h 06 min</dd></div>
+        <div><dt>Année</dt><dd>165 ans</dd></div>
+        <div><dt>Lunes connues</dt><dd>16</dd></div>
+      </dl>
+      <p class="note"><b>À savoir</b>Depuis sa découverte, elle n’a bouclé qu’une seule orbite autour du Soleil, achevée en 2011.</p>
+    </div>
+  </section>
+
+  <section class="stop outro" id="voyager" data-key="voyager" data-body="dot" data-au="165" data-accent="168,198,255">
+    <div class="stop-inner">
+      <p class="eyebrow"><span>Au-delà</span><span>Plus de 165 UA</span></p>
+      <h2>Voyager 1</h2>
+      <p class="lede">Lancée en 1977, la sonde a franchi l’héliopause en 2012 et voyage aujourd’hui dans l’espace interstellaire. Ses signaux mettent près d’une journée à nous parvenir.</p>
+      <dl class="facts">
+        <div><dt>Lancement</dt><dd>5 sept. 1977</dd></div>
+        <div><dt>Héliopause</dt><dd>25 août 2012</dd></div>
+        <div><dt>Vitesse</dt><dd>~17 km/s</dd></div>
+      </dl>
+      <p class="note"><b>Le point bleu pâle</b>Le 14 février 1990, à environ 40 UA, Voyager 1 s’est retournée pour photographier la Terre une dernière fois. Sur l’image, notre planète occupe moins d’un pixel.</p>
+      <a class="back" href="#top">Revenir au Soleil</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Valeurs arrondies, d’après les fiches planétaires de la NASA. Les tailles et distances des astres dessinés à l’écran ne sont pas à l’échelle ; seuls le compteur et la frise d’ouverture le sont.</p>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var TAU = Math.PI * 2;
+  var AU_KM = 149597870.7;
+  var AU_LIGHT_S = 499.004784;
+  var rmq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduce = rmq.matches;
+  if (rmq.addEventListener) rmq.addEventListener('change', function (e) { reduce = e.matches; });
+
+  /* ───────── Noise ───────── */
+  function rng(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function makeFbm(seed) {
+    var r = rng(seed), g = new Float32Array(65536);
+    for (var i = 0; i < g.length; i++) g[i] = r();
+    function v(x, y, px) {
+      var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+      var x0 = ((xi % px) + px) % px, x1 = (x0 + 1) % px, y0 = yi & 255, y1 = (yi + 1) & 255;
+      var a = g[(y0 << 8) | (x0 & 255)], b = g[(y0 << 8) | (x1 & 255)];
+      var c = g[(y1 << 8) | (x0 & 255)], d = g[(y1 << 8) | (x1 & 255)];
+      var u = xf * xf * (3 - 2 * xf), w = yf * yf * (3 - 2 * yf);
+      return a + (b - a) * u + (c - a) * w + (a - b - c + d) * u * w;
+    }
+    // x is periodic with period px (longitude wraps seamlessly)
+    return function (x, y, oct, px) {
+      var s = 0, amp = 0.5, f = 1, n = 0;
+      for (var o = 0; o < oct; o++) { s += amp * v(x * f, y * f, px * f); n += amp; amp *= 0.5; f *= 2; }
+      return s / n;
+    };
+  }
+  function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+  function mix(a, b, t) { t = clamp(t, 0, 1); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+  function smooth(e0, e1, x) { var t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); }
+  function wrapd(a, b) { var d = Math.abs(a - b); return Math.min(d, 1 - d); }
+
+  /* ───────── Planet textures (rows already warped to disc height) ───────── */
+  var TW = 384, TH = 192;
+  function texture(seed, fn) {
+    var c = document.createElement('canvas');
+    c.width = TW * 2; c.height = TH;
+    var x = c.getContext('2d'), img = x.createImageData(TW, TH), d = img.data, f = makeFbm(seed);
+    for (var j = 0; j < TH; j++) {
+      var lat = Math.asin((j + 0.5) / TH * 2 - 1), ln = lat / Math.PI + 0.5;
+      for (var i = 0; i < TW; i++) {
+        var col = fn(i / TW, lat, ln, f), k = (j * TW + i) * 4;
+        d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = col.length > 3 ? col[3] : 255;
+      }
+    }
+    x.putImageData(img, 0, 0);
+    x.putImageData(img, TW, 0); // doubled so a wrapped slice never runs off the edge
+    return c;
+  }
+
+  var craters = (function () {
+    var r = rng(7), out = [];
+    for (var i = 0; i < 46; i++) out.push({ lo: r(), la: (r() * 2 - 1) * 1.25, rad: (0.012 + Math.pow(r(), 3) * 0.06) * TAU });
+    return out;
+  })();
+
+  var GEN = {
+    sun: function () {
+      return texture(21, function (lon, lat, ln, f) {
+        var n = f(lon * 16, ln * 8, 4, 16);
+        return mix([255, 128, 24], [255, 222, 140], n * 1.2);
+      });
+    },
+    mercury: function () {
+      return texture(3, function (lon, lat, ln, f) {
+        var s = 92 + f(lon * 8, ln * 4, 5, 8) * 110;
+        for (var i = 0; i < craters.length; i++) {
+          var c = craters[i];
+          var dlo = wrapd(lon, c.lo) * TAU * Math.cos(lat), dla = lat - c.la;
+          var dd = Math.sqrt(dlo * dlo + dla * dla) / c.rad;
+          if (dd < 1.15) s *= dd < 0.85 ? 0.8 + 0.2 * dd : 1.1;
+        }
+        return [s * 1.02, s * 0.98, s * 0.93];
+      });
+    },
+    venus: function () {
+      return texture(5, function (lon, lat, ln, f) {
+        var q = f(lon * 6, ln * 6, 3, 6);
+        var t = f(lon * 4 + q * 1.6, ln * 14, 5, 4);
+        return mix([196, 150, 86], [248, 230, 186], t * 1.3 - 0.1);
+      });
+    },
+    earth: function () {
+      return texture(9, function (lon, lat, ln, f) {
+        var n = f(lon * 6, ln * 3, 6, 6), c;
+        if (n > 0.53) {
+          var dry = (1 - Math.abs(Math.abs(lat) - 0.42) * 3) * 0.7 + (f(lon * 10, ln * 5 + 30, 4, 10) - 0.5) * 1.4;
+          c = mix([46, 98, 44], [182, 154, 100], dry);
+          if (n < 0.55) c = mix(c, [210, 196, 150], 0.3);
+        } else {
+          c = mix([8, 34, 86], [30, 98, 172], f(lon * 12, ln * 6 + 60, 3, 12) * 0.8 + (n - 0.3));
+        }
+        if (Math.abs(lat) > 1.16 + (f(lon * 8, ln * 8 + 90, 3, 8) - 0.5) * 0.25) c = [236, 242, 248];
+        return c;
+      });
+    },
+    earthClouds: function () {
+      return texture(13, function (lon, lat, ln, f) {
+        var a = smooth(0.5, 0.72, f(lon * 8, ln * 6, 5, 8));
+        return [255, 255, 255, a * 230];
+      });
+    },
+    mars: function () {
+      return texture(17, function (lon, lat, ln, f) {
+        var n = f(lon * 6, ln * 3, 5, 6), m = f(lon * 12, ln * 6 + 20, 4, 12);
+        var c = mix([150, 58, 26], [218, 124, 72], n * 1.3 - 0.1);
+        if (m < 0.44) c = mix(c, [92, 38, 20], (0.44 - m) * 4);
+        if (Math.abs(lat) > 1.34) c = mix(c, [242, 234, 226], 0.9);
+        return c;
+      });
+    },
+    jupiter: function () {
+      return texture(23, function (lon, lat, ln, f) {
+        var turb = f(lon * 5, ln * 8, 4, 5);
+        var b = Math.sin(lat * 16 + turb * 3) * 0.5 + 0.5;
+        var b2 = Math.sin(lat * 7 + turb) * 0.5 + 0.5;
+        var c = mix([240, 226, 200], [148, 98, 68], Math.pow(b, 1.6));
+        c = mix(c, [224, 150, 88], b2 * 0.35);
+        var dlo = wrapd(lon, 0.35) * TAU * Math.cos(lat), dla = lat + 0.38;
+        var e = (dlo / 0.32) * (dlo / 0.32) + (dla / 0.12) * (dla / 0.12);
+        if (e < 1) c = mix(c, [192, 84, 56], (1 - e) * 0.8 + 0.2);
+        return c;
+      });
+    },
+    saturn: function () {
+      return texture(29, function (lon, lat, ln, f) {
+        var turb = f(lon * 4, ln * 8, 3, 4);
+        var b = Math.sin(lat * 11 + turb * 1.5) * 0.5 + 0.5;
+        return mix([238, 216, 166], [194, 158, 98], b * 0.8);
+      });
+    },
+    uranus: function () {
+      return texture(31, function (lon, lat, ln, f) {
+        var n = f(lon * 4, ln * 6, 3, 4), b = Math.sin(lat * 5) * 0.5 + 0.5;
+        return mix([142, 206, 216], [184, 232, 236], b * 0.5 + n * 0.3);
+      });
+    },
+    neptune: function () {
+      return texture(37, function (lon, lat, ln, f) {
+        var turb = f(lon * 5, ln * 6, 4, 5);
+        var b = Math.sin(lat * 9 + turb * 2) * 0.5 + 0.5;
+        var c = mix([30, 58, 164], [80, 118, 228], b);
+        var dlo = wrapd(lon, 0.6) * TAU * Math.cos(lat), dla = lat + 0.35;
+        var e = (dlo / 0.26) * (dlo / 0.26) + (dla / 0.1) * (dla / 0.1);
+        if (e < 1) c = mix(c, [18, 30, 88], 1 - e * 0.6);
+        if (Math.abs(lat + 0.52) < 0.035 && turb > 0.5) c = mix(c, [235, 240, 255], 0.55);
+        return c;
+      });
+    }
+  };
+  var TEX = {};
+  function tex(name) { if (!TEX[name]) TEX[name] = GEN[name](); return TEX[name]; }
+
+  var BODY = {
+    mercury: { size: 0.55, spin: 0.012, tilt: 0.03, off: 0.1 },
+    venus:   { size: 0.8,  spin: -0.006, tilt: 0.05, off: 0.3, atmo: '255,222,160' },
+    earth:   { size: 0.84, spin: 0.03, tilt: 0.41, off: 0.55, atmo: '110,170,255', clouds: true },
+    mars:    { size: 0.64, spin: 0.03, tilt: 0.44, off: 0.2, atmo: '255,150,110' },
+    jupiter: { size: 1.12, spin: 0.05, tilt: 0.05, off: 0.1 },
+    saturn:  { size: 0.72, spin: 0.045, tilt: 0.47, off: 0.4, rings: 'saturn' },
+    uranus:  { size: 0.78, spin: 0.03, tilt: 1.71, off: 0.2, atmo: '160,230,235', rings: 'uranus' },
+    neptune: { size: 0.78, spin: 0.03, tilt: 0.49, off: 0.7, atmo: '110,140,255' }
+  };
+
+  var RINGS = (function () {
+    var r = rng(11), sat = [];
+    for (var x = 1.24; x < 2.28; x += 0.012) {
+      var a;
+      if (x < 1.52) a = 0.16;
+      else if (x < 1.95) a = 0.62 + 0.2 * (x - 1.52);
+      else if (x < 2.03) a = 0.04;
+      else if (Math.abs(x - 2.21) < 0.012) a = 0.08;
+      else a = 0.42;
+      a *= 0.75 + r() * 0.5;
+      sat.push({ rad: x, w: 0.016, c: x < 1.52 ? '170,150,120' : x < 1.95 ? '228,208,165' : '205,188,150', a: Math.min(a, 0.9) });
+    }
+    return {
+      saturn: { squash: 0.26, bands: sat },
+      uranus: { squash: 0.22, bands: [
+        { rad: 1.62, w: 0.006, c: '205,225,230', a: 0.22 },
+        { rad: 1.74, w: 0.006, c: '205,225,230', a: 0.18 },
+        { rad: 1.98, w: 0.012, c: '220,235,240', a: 0.34 }
+      ] }
+    };
+  })();
+
+  var ROCKS = (function () {
+    var r = rng(41), out = [];
+    for (var i = 0; i < 150; i++) {
+      var shape = [];
+      for (var k = 0; k < 8; k++) shape.push(0.62 + r() * 0.38);
+      out.push({ x: r(), y: r() * 1.3 - 0.3, z: Math.pow(r(), 1.4), s: 0.5 + r(), rot: r() * TAU, vr: (r() - 0.5) * 0.6, shape: shape });
+    }
+    return out;
+  })();
+
+  /* ───────── Canvases ───────── */
+  var skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
+  var bodC = document.getElementById('bodies'), bod = bodC.getContext('2d');
+  var W = 0, H = 0, DPR = 1, stars = [];
+  var DEPTH = [0.03, 0.08, 0.18];
+  var VOID = getComputedStyle(document.documentElement).getPropertyValue('--void').trim() || '#04050b';
+
+  function buildStars() {
+    var n = Math.round(W * H / 1700), r = rng(3);
+    stars = [];
+    for (var i = 0; i < n; i++) {
+      var L = r(), layer = L < 0.6 ? 0 : L < 0.9 ? 1 : 2;
+      stars.push({ x: r() * W, y: r() * H, l: layer, s: [0.7, 1.1, 1.7][layer] * (0.6 + r() * 0.7), a: 0.35 + r() * 0.6, tw: r() * TAU, h: r() });
+    }
+  }
+
+  var lastW = 0;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    [skyC, bodC].forEach(function (c) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); });
+    sky.setTransform(DPR, 0, 0, DPR, 0, 0);
+    bod.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (Math.abs(W - lastW) > 40 || !stars.length) { buildStars(); lastW = W; }
+    measure();
+  }
+
+  function drawSky(y, vel, t) {
+    sky.globalAlpha = 1;
+    sky.fillStyle = VOID;
+    sky.fillRect(0, 0, W, H);
+
+    // faint nebulae drifting with a slow parallax
+    var neb = [[0.18, 0.3, '92,64,170', 0.11], [0.82, 1.2, '40,126,150', 0.08], [0.45, 2.1, '170,80,110', 0.06]];
+    for (var i = 0; i < neb.length; i++) {
+      var ny = ((neb[i][1] * H - y * 0.02) % (H * 2.4) + H * 2.4) % (H * 2.4) - H * 0.4;
+      var nr = Math.max(W, H) * 0.55;
+      var g = sky.createRadialGradient(neb[i][0] * W, ny, 0, neb[i][0] * W, ny, nr);
+      g.addColorStop(0, 'rgba(' + neb[i][2] + ',' + neb[i][3] + ')');
+      g.addColorStop(1, 'rgba(' + neb[i][2] + ',0)');
+      sky.fillStyle = g;
+      sky.fillRect(0, 0, W, H);
+    }
+
+    for (var j = 0; j < stars.length; j++) {
+      var s = stars[j];
+      var yy = ((s.y - y * DEPTH[s.l]) % H + H) % H;
+      var col = s.h < 0.15 ? '#ffd8ac' : s.h > 0.86 ? '#b4ccff' : '#ffffff';
+      sky.globalAlpha = s.a * (reduce ? 1 : 0.72 + 0.28 * Math.sin(t * 1.3 + s.tw));
+      var len = vel * DEPTH[s.l] * 5;
+      if (Math.abs(len) > 1.2) {
+        len = clamp(len, -120, 120);
+        sky.strokeStyle = col;
+        sky.lineWidth = s.s;
+        sky.beginPath();
+        sky.moveTo(s.x, yy);
+        sky.lineTo(s.x, yy + len);
+        sky.stroke();
+      } else {
+        sky.fillStyle = col;
+        sky.fillRect(s.x, yy, s.s, s.s);
+      }
+    }
+    sky.globalAlpha = 1;
+  }
+
+  // Draws textured slices with arcsine spacing so the texture wraps a sphere.
+  function sphere(ctx, layers, cx, cy, r, tilt, shade) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(tilt);
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.clip();
+    var step = Math.max(1, r / 140);
+    for (var L = 0; L < layers.length; L++) {
+      var tx = layers[L].tex, rot = layers[L].rot;
+      for (var x = -r; x < r; x += step) {
+        var x2 = Math.min(r, x + step);
+        var u0 = Math.asin(clamp(x / r, -1, 1)) / Math.PI, u1 = Math.asin(clamp(x2 / r, -1, 1)) / Math.PI;
+        var su = (((u0 * 0.5 + rot) % 1) + 1) % 1;
+        var sw = Math.max((u1 - u0) * 0.5 * TW, 0.3);
+        ctx.drawImage(tx, su * TW, 0, sw, TH, x, -r, x2 - x + 0.6, 2 * r);
+      }
+    }
+    ctx.rotate(-tilt);
+    if (shade) {
+      var lx = -0.42 * r, ly = -0.3 * r;
+      var g = ctx.createRadialGradient(lx, ly, 0, lx, ly, r * 1.6);
+      g.addColorStop(0, 'rgba(255,255,255,0.08)');
+      g.addColorStop(0.36, 'rgba(0,0,0,0)');
+      g.addColorStop(0.64, 'rgba(0,0,0,0.5)');
+      g.addColorStop(0.86, 'rgba(2,3,10,0.93)');
+      ctx.fillStyle = g;
+      ctx.fillRect(-r, -r, 2 * r, 2 * r);
+    }
+    var limb = ctx.createRadialGradient(0, 0, r * 0.7, 0, 0, r);
+    limb.addColorStop(0, 'rgba(0,0,0,0)');
+    limb.addColorStop(1, shade ? 'rgba(0,0,0,0.35)' : 'rgba(170,50,0,0.55)');
+    ctx.fillStyle = limb;
+    ctx.fillRect(-r, -r, 2 * r, 2 * r);
+    ctx.restore();
+  }
+
+  function glow(ctx, cx, cy, r0, r1, rgb, a) {
+    var g = ctx.createRadialGradient(cx, cy, r0, cx, cy, r1);
+    g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')');
+    g.addColorStop(1, 'rgba(' + rgb + ',0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, r1, 0, TAU); ctx.fill();
+  }
+
+  function rings(ctx, kind, cx, cy, r, tilt, back) {
+    var R = RINGS[kind];
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(tilt);
+    ctx.scale(1, R.squash);
+    for (var i = 0; i < R.bands.length; i++) {
+      var b = R.bands[i];
+      ctx.beginPath();
+      if (back) ctx.arc(0, 0, b.rad * r, Math.PI, TAU);
+      else ctx.arc(0, 0, b.rad * r, 0, Math.PI);
+      ctx.strokeStyle = 'rgba(' + b.c + ',' + (back ? b.a * 0.7 : b.a) + ')';
+      ctx.lineWidth = b.w * r;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawSun(p, t, mobile) {
+    var cx = mobile ? W * 0.74 : W * 0.78;
+    var cy = (mobile ? H * 0.22 : H * 0.48) - p * H * (mobile ? 0.55 : 0.8);
+    var r = Math.min(W, H) * (mobile ? 0.36 : 0.33) * (1 - p * 0.3);
+    var pulse = reduce ? 1 : 1 + Math.sin(t * 0.8) * 0.03;
+    bod.globalCompositeOperation = 'lighter';
+    glow(bod, cx, cy, r * 0.6, r * 3.2 * pulse, '255,150,50', 0.42);
+    glow(bod, cx, cy, r * 0.9, r * 1.6, '255,200,110', 0.35);
+    bod.globalCompositeOperation = 'source-over';
+    sphere(bod, [{ tex: tex('sun'), rot: t * 0.008 }], cx, cy, r, 0.12, false);
+    bod.globalCompositeOperation = 'lighter';
+    glow(bod, cx - r * 0.15, cy - r * 0.15, 0, r * 0.8, '255,248,220', 0.35);
+    bod.globalCompositeOperation = 'source-over';
+  }
+
+  function drawBody(name, p, t, mobile) {
+    var B = BODY[name];
+    var base = mobile ? Math.min(W * 0.4, H * 0.22) : Math.min(W * 0.24, H * 0.34);
+    var r = base * B.size * (0.86 + 0.22 * Math.sin(p * Math.PI));
+    var cx = mobile ? W * 0.5 : W * 0.7;
+    var cy = mobile ? H * 0.27 + (0.5 - p) * H * 0.9 : H * 0.5 + (0.5 - p) * H * 1.15;
+    var rot = B.spin * t + p * 0.5 + B.off;
+    if (B.atmo) glow(bod, cx, cy, r * 0.96, r * 1.22, B.atmo, 0.4);
+    if (B.rings) rings(bod, B.rings, cx, cy, r, B.tilt, true);
+    var layers = [{ tex: tex(name), rot: rot }];
+    if (B.clouds) layers.push({ tex: tex('earthClouds'), rot: rot * 1.25 + 0.3 });
+    sphere(bod, layers, cx, cy, r, B.tilt, true);
+    if (B.rings) rings(bod, B.rings, cx, cy, r, B.tilt, false);
+  }
+
+  function drawBelt(p, t) {
+    for (var i = 0; i < ROCKS.length; i++) {
+      var k = ROCKS[i];
+      var sz = (3 + k.z * 26) * k.s;
+      var x = k.x * W + (k.z - 0.5) * (p - 0.5) * W * 0.2;
+      var y = H * (1.3 + k.y) - p * H * (1.7 + k.z * 1.2);
+      if (y < -60 || y > H + 60) continue;
+      bod.save();
+      bod.translate(x, y);
+      bod.rotate(k.rot + t * k.vr + p * k.vr * 4);
+      bod.beginPath();
+      for (var j = 0; j < k.shape.length; j++) {
+        var a = j / k.shape.length * TAU, rr = k.shape[j] * sz;
+        if (j === 0) bod.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        else bod.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      bod.closePath();
+      bod.fillStyle = 'hsl(28, 9%, ' + (13 + k.z * 34) + '%)';
+      bod.fill();
+      bod.strokeStyle = 'rgba(255,238,215,' + (0.06 + k.z * 0.2) + ')';
+      bod.lineWidth = 1;
+      bod.stroke();
+      bod.restore();
+    }
+  }
+
+  function drawDot(p, t, mobile) {
+    var cx = mobile ? W * 0.62 : W * 0.7;
+    var cy = (mobile ? H * 0.26 : H * 0.5) + (0.5 - p) * H * 0.7;
+    // scattered-light bands, like the 1990 frame
+    var beams = [[-0.35, 0, 70, 0.14], [-0.35, -150, 26, 0.07], [-0.35, 130, 40, 0.06]];
+    for (var i = 0; i < beams.length; i++) {
+      bod.save();
+      bod.translate(cx, cy);
+      bod.rotate(beams[i][0]);
+      var g = bod.createLinearGradient(0, beams[i][1] - beams[i][2], 0, beams[i][1] + beams[i][2]);
+      g.addColorStop(0, 'rgba(214,170,120,0)');
+      g.addColorStop(0.5, 'rgba(214,170,120,' + beams[i][3] + ')');
+      g.addColorStop(1, 'rgba(214,170,120,0)');
+      bod.fillStyle = g;
+      bod.fillRect(-W * 1.4, beams[i][1] - beams[i][2], W * 2.8, beams[i][2] * 2);
+      bod.restore();
+    }
+    var pulse = reduce ? 1 : 1 + Math.sin(t * 2) * 0.15;
+    glow(bod, cx, cy, 0, 16 * pulse, '150,190,255', 0.5);
+    bod.fillStyle = '#c8dcff';
+    bod.beginPath(); bod.arc(cx, cy, 1.8, 0, TAU); bod.fill();
+  }
+
+  /* ───────── Sections, HUD, rail ───────── */
+  var secs = Array.prototype.slice.call(document.querySelectorAll('[data-body]')).map(function (el) {
+    return { el: el, key: el.getAttribute('data-key'), body: el.getAttribute('data-body'), au: parseFloat(el.getAttribute('data-au')), accent: el.getAttribute('data-accent') };
+  });
+  var railLinks = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var hudAu = document.getElementById('hud-au'), hudKm = document.getElementById('hud-km'), hudLight = document.getElementById('hud-light');
+  var root = document.documentElement;
+  var anchors = [];
+
+  function measure() {
+    anchors = secs.map(function (s) {
+      var top = s.el.getBoundingClientRect().top + window.scrollY;
+      return { y: s.au === 0 ? 0 : top + s.el.offsetHeight / 2 - H / 2, au: s.au };
+    }).sort(function (a, b) { return a.y - b.y; });
+  }
+
+  function auAt(y) {
+    if (!anchors.length || y <= anchors[0].y) return anchors.length ? anchors[0].au : 0;
+    for (var i = 0; i < anchors.length - 1; i++) {
+      var a = anchors[i], b = anchors[i + 1];
+      if (y <= b.y) {
+        var k = (y - a.y) / Math.max(1, b.y - a.y);
+        if (a.au <= 0) return b.au * k;
+        return Math.exp(Math.log(a.au) + (Math.log(b.au) - Math.log(a.au)) * k);
+      }
+    }
+    return anchors[anchors.length - 1].au;
+  }
+
+  var fmt2 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var fmt1 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  var fmt0 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function lightTime(s) {
+    if (s < 1) return '0 s';
+    if (s < 60) return Math.round(s) + ' s';
+    if (s < 3600) { var m = Math.floor(s / 60); return m + ' min ' + pad(Math.floor(s % 60)) + ' s'; }
+    var h = Math.floor(s / 3600); return h + ' h ' + pad(Math.floor((s % 3600) / 60)) + ' min';
+  }
+  var lastHud = '';
+  function updateHud(y) {
+    var au = auAt(y);
+    var auTxt = (au < 10 ? fmt2 : au < 100 ? fmt1 : fmt0).format(au) + ' UA';
+    if (auTxt === lastHud) return;
+    lastHud = auTxt;
+    hudAu.textContent = auTxt;
+    hudKm.textContent = fmt0.format(Math.round(au * AU_KM));
+    hudLight.textContent = lightTime(au * AU_LIGHT_S);
+  }
+
+  var active = null;
+  function setActive(s) {
+    active = s;
+    root.style.setProperty('--accent', 'rgb(' + s.accent + ')');
+    railLinks.forEach(function (a) {
+      if (a.getAttribute('data-key') === s.key) a.setAttribute('aria-current', 'step');
+      else a.removeAttribute('aria-current');
+    });
+  }
+
+  /* ───────── Loop ───────── */
+  var lastY = window.scrollY, vel = 0;
+  function frame(now) {
+    var t = reduce ? 0 : now / 1000;
+    var y = window.scrollY;
+    vel += ((y - lastY) - vel) * 0.2;
+    lastY = y;
+    drawSky(y, reduce ? 0 : vel, t);
+    bod.clearRect(0, 0, W, H);
+
+    var mobile = W <= 760, center = null;
+    for (var i = 0; i < secs.length; i++) {
+      var s = secs[i], r = s.el.getBoundingClientRect();
+      if (r.top < H * 0.5 && r.bottom > H * 0.5) center = s;
+      if (r.bottom < -H * 0.2 || r.top > H * 1.2) continue;
+      if (s.body === 'sun') { drawSun(clamp(-r.top / Math.max(1, r.height), 0, 1.3), t, mobile); continue; }
+      var p = (H - r.top) / (r.height + H);
+      if (p <= 0 || p >= 1) continue;
+      if (s.body === 'belt') drawBelt(p, t);
+      else if (s.body === 'dot') drawDot(p, t, mobile);
+      else drawBody(s.body, p, t, mobile);
+    }
+    if (center && center !== active) setActive(center);
+    updateHud(y);
+    requestAnimationFrame(frame);
+  }
+
+  // Build the first textures now, the rest during idle time so scrolling never stalls.
+  tex('sun'); tex('mercury');
+  var queue = ['venus', 'earth', 'earthClouds', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
+  (function pump() {
+    if (!queue.length) return;
+    tex(queue.shift());
+    if ('requestIdleCallback' in window) requestIdleCallback(pump, { timeout: 400 });
+    else setTimeout(pump, 60);
+  })();
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('load', measure);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
